@@ -1,0 +1,5 @@
+{
+  "name": "Chatbot Mohamed",
+  "description": "An advanced, custom chatbot named 'Mohamed' built with React and Gemini API. It engages in natural, context-aware conversations and maintains a history of the dialogue.",
+  "requestFramePermissions": []
+}
