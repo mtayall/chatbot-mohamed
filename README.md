@@ -1,34 +1,104 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Chatbot Mohamed
 
-# Run and deploy your AI Studio app
+An Arabic conversational-interface prototype built with **React**, **TypeScript**, and **Vite**. The browser UI sends messages to Gemini with a fixed Arabic system instruction and renders the conversation locally.
 
-This contains everything you need to run your app locally.
+> **Project status:** Client-side AI prototype. The audited production build succeeds, but the project has no automated test suite and does not have a verified public deployment listed in this README.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1xn7nwJjyHYb7v6BnOBtPhDxgwTXASsYP
+## Verified capabilities
 
-## Run Locally
+- Arabic right-to-left chat interface.
+- Local message history maintained in React state.
+- Gemini text generation through `@google/genai`.
+- A fixed system instruction that frames the assistant as a professional Arabic guide.
+- Loading and error states for model requests.
 
-**Prerequisites:** Node.js
+## Architecture
 
-1. Install dependencies:
-   `npm install`
-2. Set the **VITE_GEMINI_API_KEY** in the **.env** file (or .env.local) to your Gemini API key.
-3. Run the app:
-   `npm run dev`
+```mermaid
+flowchart LR
+  U[User] --> UI[React chat UI]
+  UI --> S[Local message state]
+  UI --> G[Gemini SDK in browser]
+  G --> R[Text response]
+  R --> S
+```
 
----
-### تعليمات رفع التحديثات النهائية:
+`App.tsx` composes the user interface, while `services/geminiService.ts` initializes the Gemini client and submits chat history. There is no inspected server-side API, database, authentication layer, or persistent conversation store.
 
-للتأكد من مزامنة كل الملفات المُعدلة والمحذوفة مع GitHub، استخدم الأوامر التالية بالترتيب:
+See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the current implementation boundary.
+
+## Tech stack
+
+| Area | Verified technology |
+|---|---|
+| UI | React 19, TypeScript |
+| Build tooling | Vite |
+| AI integration | `@google/genai` |
+| Styling | Tailwind CSS CDN and Cairo font |
+| State | In-memory React state |
+
+## Local setup
+
+### Prerequisites
+
+- Node.js 20 or later is recommended.
+- A Gemini API key for controlled local development.
+
+Install dependencies:
 
 ```bash
-# 1. إضافة كل التغييرات الجديدة والحذف:
-git add .
+npm ci
+```
 
-# 2. تسجيل التغييرات في سجل جديد:
-git commit -m "Final codebase cleanup and service logic implementation"
+Create `.env.local`:
 
-# 3. رفع التغييرات إلى GitHub:
-git push origin main
+```bash
+VITE_GEMINI_API_KEY=replace-with-your-local-development-key
+```
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Build the application:
+
+```bash
+npm run build
+```
+
+## Quality checks
+
+```bash
+npm run typecheck
+npm run build
+npm run check
+```
+
+No unit, integration, or end-to-end tests are present today. A successful type check and build do not verify model quality, user safety, accessibility, or public deployment behaviour.
+
+## Security and deployment boundary
+
+A `VITE_` environment variable is deliberately exposed to browser code by Vite. Therefore, the current direct-provider pattern must not be used to ship a long-lived secret API key in a public deployment.
+
+Do not commit credentials. Before public deployment, move Gemini calls to a server-side endpoint, keep provider credentials on the server, add request limits and input validation, and define appropriate logging and error handling. See [`docs/SECURITY.md`](./docs/SECURITY.md).
+
+## Deployment
+
+No functioning public demo was verified during this review, so no deployment URL is listed. A demo link should be added only after its URL and server-side key boundary are verified.
+
+## Repository structure
+
+```text
+.
+├── App.tsx                    # Chat UI composition and state
+├── services/geminiService.ts  # Gemini client and request function
+├── vite.config.ts             # Vite build configuration
+├── package.json               # Scripts and dependencies
+└── docs/                      # Architecture and security notes
+```
+
+## License
+
+No license file is currently included. Treat reuse rights as unspecified until the repository owner adds one.
