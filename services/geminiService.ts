@@ -1,33 +1,44 @@
-import { GoogleGenAI, Chat } from "@google/genai";
+import type { Message } from '../types';
 
-// 1. استخدام الصيغة الصحيحة لقراءة متغيرات البيئة في Vite
-// الكود يقرأ المتغير VITE_GEMINI_API_KEY من ملف .env
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+type AiResponse = { text?: unknown };
 
-if (!API_KEY) {
-    // 2. تحديث رسالة الخطأ لتتناسب مع المتغير الجديد
-    throw new Error("Missing VITE_GEMINI_API_KEY environment variable.");
-}
+const MAX_HISTORY_MESSAGES = 20;
+const MAX_MESSAGE_LENGTH = 1_200;
 
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+const normalizeMessages = (messages: Message[]): { role: 'user' | 'model'; parts: { text: string }[] }[] =>
+  messages
+    .filter(
+      (message) =>
+        (message.role === 'user' || message.role === 'model') &&
+        typeof message.text === 'string' &&
+        message.text.trim().length > 0,
+    )
+    .slice(-MAX_HISTORY_MESSAGES)
+    .map((message) => ({
+      role: message.role,
+      parts: [{ text: message.text.trim().slice(0, MAX_MESSAGE_LENGTH) }],
+    }));
 
-const model = ai.models['gemini-2.5-flash'];
+export const sendMessageToGemini = async (history: Message[], message: string): Promise<string> => {
+  const trimmedMessage = message.trim();
+  if (!trimmedMessage || trimmedMessage.length > MAX_MESSAGE_LENGTH) {
+    throw new Error('INVALID_MESSAGE');
+  }
 
-export const createChatSession = (): Chat => {
-    return ai.chats.create({
-        model: 'gemini-2.5-flash',
-        config: {
-            systemInstruction: "أنت مساعد ذكاء اصطناعي متطور واسمك محمد. مهمتك هي مساعدة المستخدمين بإجابات دقيقة ومفيدة. كن مهذباً وودوداً في جميع تفاعلاتك. تحدث باللغة العربية.",
-        },
-    });
-};
+  const response = await fetch('/api/ai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'chat',
+      history: normalizeMessages(history),
+      message: trimmedMessage,
+    }),
+  });
 
-export const sendMessageToGemini = async (chat: Chat, message: string): Promise<string> => {
-    try {
-        const result = await chat.sendMessage({ message: message });
-        return result.text;
-    } catch (error) {
-        console.error("Error sending message to Gemini:", error);
-        return "عذراً، حدث خطأ أثناء محاولة التواصل مع الذكاء الاصطناعي. يرجى المحاولة مرة أخرى.";
-    }
+  const payload: AiResponse | null = await response.json().catch(() => null);
+  if (!response.ok || !payload || typeof payload.text !== 'string' || !payload.text.trim()) {
+    throw new Error('AI_REQUEST_FAILED');
+  }
+
+  return payload.text.trim();
 };
