@@ -1,24 +1,35 @@
 # Security Notes
 
-## Current security boundary
+## Implemented boundary
 
-This repository is a client-side prototype. It does not contain a backend service, user authentication, authorization policy, rate limiting, or a server-only secret store.
+The Gemini credential is now server-side only. Browser code calls `/api/ai`; `api/ai.ts` reads `GEMINI_API_KEY` at runtime, validates the chat payload, and returns controlled errors. The Vite client build no longer receives a `VITE_GEMINI_API_KEY` value or a provider SDK import-map entry.
 
-## `VITE_GEMINI_API_KEY` is browser-visible
-
-Vite exposes variables prefixed with `VITE_` to browser code. Consequently, `VITE_GEMINI_API_KEY` must not hold a long-lived production secret in a public deployment.
-
-- Never commit `.env`, `.env.local`, API keys, tokens, or private credentials.
-- Use only a restricted key for local development and controlled experiments.
-- Do not treat client-side environment configuration as a secret-management system.
-
-## Before public deployment
-
-Move provider calls behind a server-side API. The server should retain the provider credential, validate requests and returned data, apply rate limits, set explicit maximum input sizes, and use error handling appropriate to the deployment.
+| Control | Implemented behavior | Limit |
+|---|---|---|
+| Credential isolation | `GEMINI_API_KEY` is read only in the server function | Relies on correct runtime configuration |
+| Method restriction | Only `POST` is accepted | Not caller authentication |
+| History validation | Roles, message text, count, and sizes are bounded | Does not moderate semantic content |
+| Context bound | Recent messages only are sent through the normal client contract | Direct callers can still make allowed requests without accounts |
+| Basic rate limit | In-memory per-IP request window | Not shared across serverless instances |
+| Error translation | The UI receives stable service errors | No production alerting or log-retention policy is configured |
 
 ## Conversation data
 
-The inspected code maintains the conversation only in browser memory. It does not establish a privacy policy, retention policy, or server-side data controls. If persistence is added, the data flow and user notice should be designed before collecting conversations.
+The application keeps the visible conversation in browser memory only. A page reload clears it, and the repository does not implement server-side conversation persistence. If persistence is introduced later, define retention, user notice, access controls, and deletion behavior before collecting chat content.
+
+## Environment configuration
+
+Create `.env.local` from `.env.example` for local serverless development:
+
+```dotenv
+GEMINI_API_KEY=replace-with-your-development-key
+```
+
+Do not commit credentials or local environment files. Do not use `VITE_GEMINI_API_KEY`; Vite-prefixed environment variables are browser-visible.
+
+## Deployment requirements
+
+For a public deployment, configure `GEMINI_API_KEY` in the server runtime only and verify that `api/ai.ts` is executed server-side. The current in-memory limiter is intentionally lightweight. A publicly exposed multi-instance service should add shared rate limiting and an authentication or abuse-control design appropriate to the product.
 
 ## Reporting a security concern
 
@@ -26,4 +37,4 @@ Do not publish credentials or sensitive vulnerability details in a public issue.
 
 ## Scope note
 
-This document describes the verified application boundary. It is not a security audit certification or a claim of compliance with a specific security standard.
+This document records source-level controls. It is not a penetration-test result, compliance certification, or claim of complete production security.

@@ -2,33 +2,46 @@
 
 ## System boundary
 
-`chatbot-mohamed` is a browser-only React application. The inspected source does not include a backend service, database, authentication flow, server-side provider proxy, or persistent chat history.
+`chatbot-mohamed` is a Vite React interface with an in-memory browser conversation and a separate serverless AI boundary. The browser does not receive `GEMINI_API_KEY` and does not import the provider SDK.
 
 ```mermaid
-flowchart TD
-  U[User] --> UI[React interface]
-  UI --> H[Conversation history in React state]
-  H --> S[geminiService.ts]
-  S --> G[Gemini SDK]
-  G --> R[Generated text]
-  R --> H
-  H --> UI
+sequenceDiagram
+  participant User
+  participant UI as React chat UI
+  participant State as in-memory history
+  participant Client as geminiService client
+  participant API as /api/ai server function
+  participant Provider as Gemini API
+
+  User->>UI: submits a message
+  UI->>State: append visible user message
+  UI->>Client: capped history plus message
+  Client->>API: POST chat payload
+  API->>API: validate method, roles, text, size, and rate limit
+  API->>Provider: request with server-only credential
+  Provider-->>API: generated text
+  API-->>Client: text or controlled error
+  Client-->>State: append visible assistant message
+  State-->>UI: render conversation
 ```
 
-## Request flow
+## Responsibilities
 
-1. The user submits a message through the React interface.
-2. The application appends it to the in-memory conversation history.
-3. `services/geminiService.ts` sends the history to Gemini with a fixed Arabic system instruction.
-4. The generated text is appended to local state and rendered in the conversation.
-5. Reloading the page clears the conversation because no persistent store is present in the inspected source.
+| Layer | Verified responsibility | Does not provide |
+|---|---|---|
+| `components/Chatbot.tsx` | Input, loading/error state, and visible local conversation | Credential access or remote persistence |
+| `services/geminiService.ts` | Sends the bounded chat request to `/api/ai` | Direct provider calls |
+| `api/ai.ts` | Credential isolation, method and history validation, request limits, provider call, controlled errors | Authentication, account management, or durable storage |
+| React state | Current browser-session message history | Persistence across reloads or devices |
 
-## Provider-key boundary
+## Request contract
 
-The integration reads `import.meta.env.VITE_GEMINI_API_KEY`. Vite exposes environment variables prefixed with `VITE_` to browser code, so this is suitable only for controlled local development with a restricted key. It is not a server-side secret boundary.
+Only `POST` requests are accepted. A request contains an action, a non-empty current message, and a bounded list of messages. Every history item must have an allowed role and a non-empty text field within the configured limits. The server limits the retained history before invoking the provider, so a browser cannot make the provider prompt grow unbounded through the normal interface.
 
-A production evolution would move Gemini requests to an application server. The server would keep credentials private, accept validated requests, apply rate limits, limit message sizes, and return a defined response shape to the browser. This is recommended future work, not existing functionality.
+## Deployment contract
 
-## Explicitly absent capabilities
+The Vite build produces `dist/`; `api/ai.ts` is designed for a Vercel-style server function. `GEMINI_API_KEY` must be a server-only deployment variable. The architecture does not establish accounts, a database, moderation policy, distributed rate limits, or a verified production deployment.
 
-The current implementation does not establish user identity, store conversations remotely, provide moderation controls, perform server-side request limiting, or contain automated tests. These features should not be inferred from the chat UI.
+## Known limits
+
+The rate limiter is in-memory and applies only to one server-function instance. The system prompt and generated response are application behavior, not a guarantee of safety or accuracy. Conversation history is intentionally not persisted and is lost on page reload.

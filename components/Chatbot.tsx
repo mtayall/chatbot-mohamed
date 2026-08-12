@@ -1,8 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import type { Chat } from '@google/genai';
 import { Message } from '../types';
-import { createChatSession, sendMessageToGemini } from '../services/geminiService';
+import { sendMessageToGemini } from '../services/geminiService';
 import { SendIcon, BotIcon, UserIcon } from './icons';
 
 const Chatbot: React.FC = () => {
@@ -12,13 +11,7 @@ const Chatbot: React.FC = () => {
   const [inputValue, setInputValue] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const chatSession = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Initialize the chat session when the component mounts
-    chatSession.current = createChatSession();
-  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -27,7 +20,7 @@ const Chatbot: React.FC = () => {
   useEffect(scrollToBottom, [messages]);
   
   const handleSendMessage = useCallback(async () => {
-    if (!inputValue.trim() || isLoading || !chatSession.current) return;
+    if (!inputValue.trim() || isLoading) return;
     
     const userMessage: Message = { role: 'user', text: inputValue.trim() };
     setMessages(prev => [...prev, userMessage]);
@@ -36,7 +29,7 @@ const Chatbot: React.FC = () => {
     setError(null);
 
     try {
-        const responseText = await sendMessageToGemini(chatSession.current, userMessage.text);
+        const responseText = await sendMessageToGemini(messages, userMessage.text);
         const modelMessage: Message = { role: 'model', text: responseText };
         setMessages(prev => [...prev, modelMessage]);
     } catch (e) {
@@ -48,7 +41,7 @@ const Chatbot: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [inputValue, isLoading]);
+  }, [inputValue, isLoading, messages]);
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
